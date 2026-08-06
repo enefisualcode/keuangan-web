@@ -213,7 +213,7 @@ h2::after{content:"";flex:1;height:1px;background:var(--line)}
 </div>
 
 <section class="hero">
-  <div class="hero-lbl">Hari ini</div>
+  <div class="hero-lbl" id="heroLbl">Hari ini</div>
   <div class="hero-tgl" id="heroTgl">—</div>
   <div class="hero-num" id="heroNum">—</div>
   <div class="banding" id="banding"></div>
@@ -319,19 +319,9 @@ function gambar(){
     fmt(mulai,{day:"numeric",month:"short"}) + " – " +
     fmt(selesai,{day:"numeric",month:"short",year:"numeric"});
 
-  /* ---------- hero ---------- */
-  document.getElementById("heroTgl").textContent =
-    fmt(hariIni,{weekday:"long",day:"numeric",month:"long",year:"numeric"});
-  document.getElementById("heroNum").textContent = rp(totalHariIni);
-
-  const selisih = totalHariIni - rata;
-  const pct = rata ? Math.abs(selisih/rata*100) : 0;
-  document.getElementById("banding").innerHTML = totalHariIni === 0
-    ? `Belum ada pengeluaran hari ini.`
-    : `<span class="pil ${selisih>0?"atas":"bawah"}">
-         ${selisih>0?"▲":"▼"} ${pct.toFixed(0)}%
-       </span>
-       <span>${selisih>0?"di atas":"di bawah"} rata-rata harianmu</span>`;
+  /* ---------- hero ----------
+     Kartu atas sekarang mengikuti hari yang dipilih di dropdown/grafik.
+     Pengisiannya dilakukan oleh renderHero(), dipanggil dari pilihHari(). */
 
   /* ---------- total Pay Later (pengingat menahan diri) ----------
      Utamakan nilai "Total Paylater" dari sheet Rekap Daily (dikirim Apps Script
@@ -480,8 +470,31 @@ function gambar(){
 
   const sel = document.getElementById("pilihHari");
 
+  /* Isi kartu atas (tanggal, total besar, banding) untuk satu hari.
+     Total Pay Later TIDAK diubah di sini — itu angka seluruh periode, bukan per hari. */
+  function renderHero(kunci){
+    const totalHari = perHari.get(kunci) || 0;
+    const iniHariIni = (kunci === kunciHariIni);
+
+    document.getElementById("heroLbl").textContent = iniHariIni ? "Hari ini" : "Hari dipilih";
+    document.getElementById("heroTgl").textContent =
+      fmt(d(kunci),{weekday:"long",day:"numeric",month:"long",year:"numeric"});
+    document.getElementById("heroNum").textContent = rp(totalHari);
+
+    const selisih = totalHari - rata;
+    const pct = rata ? Math.abs(selisih/rata*100) : 0;
+    document.getElementById("banding").innerHTML = totalHari === 0
+      ? (iniHariIni ? `Belum ada pengeluaran hari ini.`
+                    : `Tidak ada pengeluaran di tanggal ini.`)
+      : `<span class="pil ${selisih>0?"atas":"bawah"}">
+           ${selisih>0?"▲":"▼"} ${pct.toFixed(0)}%
+         </span>
+         <span>${selisih>0?"di atas":"di bawah"} rata-rata harianmu</span>`;
+  }
+
   function pilihHari(kunci, withTip){
     if (sel.value !== kunci) sel.value = kunci;
+    renderHero(kunci);
     renderRincian(kunci);
     chart.querySelectorAll(".col.pilih").forEach(c=>c.classList.remove("pilih"));
     if (withTip){
