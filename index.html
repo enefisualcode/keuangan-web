@@ -604,7 +604,7 @@ function gambar(){
   document.getElementById("kaki").innerHTML =
     `${trxHariIni.length} transaksi hari ini · ${periodeIni.length} periode ini<br>
      Siklus tanggal ${HARI_SIKLUS} ke ${HARI_SIKLUS-1} ·
-     <span id="segar">memuat…</span>`;
+     <span id="segar">memuat…</span> · <b>v2</b>`;
 
   gambarPeriode();
 }
@@ -614,8 +614,8 @@ function gambarPeriode(){
   const wrap = document.getElementById("pchart");
   if (!wrap) return;
   const outPer = new Map(), inPer = new Map();
-  pengeluaran.forEach(r => { const k = keyPeriode(r[0]); outPer.set(k, (outPer.get(k)||0) + r[2]); });
-  pemasukan.forEach(r => { const k = keyPeriode(r[0]); inPer.set(k, (inPer.get(k)||0) + (r[1]||0)); });
+  pengeluaran.forEach(r => { const k = keyPeriode(r[0]); outPer.set(k, (outPer.get(k)||0) + (Number(r[2])||0)); });
+  pemasukan.forEach(r => { const k = keyPeriode(r[0]); inPer.set(k, (inPer.get(k)||0) + (Number(r[1])||0)); });
 
   let keys = Array.from(new Set([...outPer.keys(), ...inPer.keys()])).sort();
   keys = keys.slice(-6);                 // 6 periode terakhir
