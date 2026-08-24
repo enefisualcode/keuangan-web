@@ -181,6 +181,16 @@ h2::after{content:"";flex:1;height:1px;background:var(--line)}
   background-repeat:no-repeat;background-position:right 10px center;
 }
 
+/* ---------- pemilih periode (siklus 25 -> 24) ---------- */
+.periode-ganti{margin:10px 20px 0;display:flex;justify-content:flex-end}
+#pilihPeriode{
+  font-family:var(--mono);font-size:11px;color:var(--blue);
+  background:var(--surface-2);border:1px solid var(--line);border-radius:9px;
+  padding:6px 24px 6px 10px;cursor:pointer;-webkit-appearance:none;appearance:none;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'><path d='M2 3.5 L5 6.5 L8 3.5' stroke='%2354A8FF' fill='none' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+  background-repeat:no-repeat;background-position:right 8px center;
+}
+
 /* ---------- batang terpilih + tooltip ---------- */
 .col.pilih i{opacity:1;outline:2px solid rgba(233,240,250,.9);outline-offset:1px;border-radius:3px}
 .chart-tip{
@@ -215,6 +225,29 @@ h2::after{content:"";flex:1;height:1px;background:var(--line)}
   font-family:var(--mono);font-size:10.5px;color:var(--faint);line-height:1.7;
 }
 
+/* ---------- pengaturan tampilan (dark/light) ---------- */
+.pengaturan{
+  margin:18px 20px 24px;background:var(--surface);border:1px solid var(--line);
+  border-radius:14px;padding:14px 15px 15px;
+}
+.pengaturan .l{
+  font-family:var(--mono);font-size:9.5px;letter-spacing:.13em;
+  text-transform:uppercase;color:var(--faint);
+}
+.tema-toggle{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin-top:10px;
+  background:var(--surface-2);padding:4px;border-radius:11px;
+}
+.tema-toggle button{
+  font-family:var(--body);font-size:12.5px;font-weight:500;color:var(--muted);
+  background:transparent;border:none;border-radius:8px;padding:9px 0;cursor:pointer;
+  transition:background .15s ease,color .15s ease;
+}
+.tema-toggle button.aktif{
+  background:var(--surface);color:var(--text);
+  box-shadow:0 1px 3px rgba(0,0,0,.18);
+}
+
 @media (prefers-reduced-motion:no-preference){
   .hero,.stat,.trx,.kosong,.harian,.kat{animation:naik .5s cubic-bezier(.22,.9,.3,1) backwards}
   .stat{animation-delay:.06s}
@@ -225,18 +258,33 @@ h2::after{content:"";flex:1;height:1px;background:var(--line)}
 }
 </style>
 <script>
-/* Set tema sedini mungkin (ikut setelan HP) agar tidak berkedip. */
+/* Set tema sedini mungkin (pilihan tersimpan > setelan HP) agar tidak berkedip.
+   Setiap akses API dibungkus try/catch sendiri-sendiri, supaya satu API yang
+   diblokir (mis. localStorage/matchMedia di lingkungan sandbox/preview) tidak
+   menghentikan skrip ini di tengah jalan dan meninggalkan tema setengah jadi. */
 (function(){
-  try{
-    var gelap = !(window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches);
-    document.documentElement.setAttribute("data-theme", gelap ? "dark" : "light");
-  }catch(e){ document.documentElement.setAttribute("data-theme","dark"); }
+  var simpanan = null;
+  try{ simpanan = localStorage.getItem("tema"); }catch(e){}
+  var gelap;
+  if (simpanan === "light") gelap = false;
+  else if (simpanan === "dark") gelap = true;
+  else {
+    var terang = false;
+    try{ terang = !!(window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches); }catch(e){}
+    gelap = !terang;
+  }
+  try{ document.documentElement.setAttribute("data-theme", gelap ? "dark" : "light"); }
+  catch(e){}
 })();
 </script>
 
 <div class="top">
   <div class="eyebrow">Pengeluaran</div>
   <div class="periode" id="periode">—</div>
+</div>
+
+<div class="periode-ganti">
+  <select id="pilihPeriode" aria-label="Pilih periode"></select>
 </div>
 
 <section class="hero">
@@ -292,6 +340,15 @@ h2::after{content:"";flex:1;height:1px;background:var(--line)}
 
 <div class="kaki" id="kaki">—</div>
 
+<div class="pengaturan">
+  <div class="l">Tampilan</div>
+  <div class="tema-toggle" id="temaToggle">
+    <button type="button" data-tema="system">Otomatis</button>
+    <button type="button" data-tema="light">Terang</button>
+    <button type="button" data-tema="dark">Gelap</button>
+  </div>
+</div>
+
 <script>
 /* ============================================================
    SUMBER DATA
@@ -306,6 +363,7 @@ let pengeluaran = [];
 let pemasukan = [];
 let totalPaylaterSheet = null;   // diisi dari Rekap Daily (via Apps Script) kalau tersedia
 let hariDipilih = null;          // kunci tanggal yang sedang dilihat di Rincian; null = hari ini
+let periodeDipilih = null;       // kode "YYYY-MM" periode yang sedang dilihat; null = periode berjalan
 
 /* ---------- util ---------- */
 const rp  = n => "Rp" + Math.round(n).toLocaleString("id-ID");
@@ -329,6 +387,14 @@ function keyPeriode(tglStr){
   return a.getFullYear() + "-" + String(a.getMonth()+1).padStart(2,"0");
 }
 
+/* Rentang tanggal (teks) untuk sebuah kode periode "YYYY-MM". */
+function labelPeriode(key){
+  const [th, bl] = key.split("-").map(Number);
+  const awal = new Date(th, bl-1, HARI_SIKLUS);
+  const akhir = new Date(awal.getFullYear(), awal.getMonth()+1, HARI_SIKLUS-1);
+  return fmt(awal,{day:"numeric",month:"short"}) + " – " + fmt(akhir,{day:"numeric",month:"short",year:"numeric"});
+}
+
 function gambar(){
   if (!pengeluaran.length){
     document.getElementById("wadahTrx").innerHTML =
@@ -342,10 +408,43 @@ function gambar(){
   const hariIni = new Date(sekarang.getFullYear(), sekarang.getMonth(), sekarang.getDate());
   const kunciHariIni = kunciTgl(hariIni);
 
-  const mulai   = awalPeriode(hariIni);
+  const periodeSekarangKey = keyPeriode(kunciTgl(hariIni));
+  const periodeAktifKey = periodeDipilih || periodeSekarangKey;
+  const sedangPeriodeIni = periodeAktifKey === periodeSekarangKey;
+  const [pTahun, pBulan] = periodeAktifKey.split("-").map(Number);
+
+  const mulai   = new Date(pTahun, pBulan-1, HARI_SIKLUS);
   const selesai = new Date(mulai.getFullYear(), mulai.getMonth()+1, HARI_SIKLUS-1);
   const totalHari = Math.round((selesai-mulai)/864e5)+1;
-  const hariKe    = Math.max(Math.round((hariIni-mulai)/864e5)+1, 1);
+  const akhirTampil = sedangPeriodeIni ? hariIni : selesai;   // periode lampau: tampilkan penuh sampai hari terakhir
+  const hariKe    = Math.max(Math.round((akhirTampil-mulai)/864e5)+1, 1);
+
+  /* ---------- isi/segarkan dropdown pilih periode ---------- */
+  const selPeriode = document.getElementById("pilihPeriode");
+  if (selPeriode){
+    const semuaKey = new Set([periodeSekarangKey]);
+    pengeluaran.forEach(r => semuaKey.add(keyPeriode(r[0])));
+    pemasukan.forEach(r => semuaKey.add(keyPeriode(r[0])));
+    const daftarPeriode = Array.from(semuaKey).sort().reverse();   // terbaru dulu
+
+    const tandaIsi = daftarPeriode.join(",");
+    if (selPeriode.dataset.terisi !== tandaIsi){
+      selPeriode.innerHTML = "";
+      daftarPeriode.forEach(k=>{
+        const opt = document.createElement("option");
+        opt.value = k;
+        opt.textContent = (k === periodeSekarangKey ? "Sekarang · " : "") + labelPeriode(k);
+        selPeriode.appendChild(opt);
+      });
+      selPeriode.dataset.terisi = tandaIsi;
+    }
+    selPeriode.value = periodeAktifKey;
+    selPeriode.onchange = () => {
+      periodeDipilih = (selPeriode.value === periodeSekarangKey) ? null : selPeriode.value;
+      hariDipilih = null;   // pindah periode = mulai lagi dari hari terakhir periode itu
+      gambar();
+    };
+  }
 
   const periodeIni = pengeluaran.filter(r=>{const t=d(r[0]); return t>=mulai && t<=selesai;});
   const trxHariIni = periodeIni.filter(r=>r[0]===kunciHariIni);
@@ -552,7 +651,8 @@ function gambar(){
   // isi dropdown: semua hari dari awal periode s/d hari ini (terbaru dulu),
   // supaya setiap batang grafik punya opsi dropdown yang cocok persis.
   const daftarHari = deret.map(x=>x.k).slice().reverse();
-  if (hariDipilih == null || !daftarHari.includes(hariDipilih)) hariDipilih = kunciHariIni;
+  const fallbackHari = sedangPeriodeIni ? kunciHariIni : daftarHari[0];
+  if (hariDipilih == null || !daftarHari.includes(hariDipilih)) hariDipilih = fallbackHari;
   sel.innerHTML = "";
   daftarHari.forEach(k=>{
     const opt = document.createElement("option");
@@ -569,7 +669,7 @@ function gambar(){
   pilihHari(hariDipilih, hariDipilih !== kunciHariIni);
 
   document.getElementById("xAwal").textContent  = fmt(mulai,{day:"numeric",month:"short"});
-  document.getElementById("xAkhir").textContent = fmt(hariIni,{day:"numeric",month:"short"});
+  document.getElementById("xAkhir").textContent = fmt(akhirTampil,{day:"numeric",month:"short"});
 
   const terboros = deret.find(x=>x.nilai===puncak);
   document.getElementById("catatan").innerHTML =
@@ -604,7 +704,8 @@ function gambar(){
   document.getElementById("kaki").innerHTML =
     `${trxHariIni.length} transaksi hari ini · ${periodeIni.length} periode ini<br>
      Siklus tanggal ${HARI_SIKLUS} ke ${HARI_SIKLUS-1} ·
-     <span id="segar">memuat…</span> · <b>v2</b>`;
+     <span id="segar">memuat…</span> · v3 ·
+     in ${pemasukan.length}r/${rpk(pemasukan.reduce((a,r)=>a+(Number(r[1])||0),0))}`;
 
   gambarPeriode();
 }
@@ -700,6 +801,7 @@ muat();
 document.addEventListener("visibilitychange", () => {
   if (!document.hidden){
     hariDipilih = null;   // kembali ke hari ini saat dashboard dibuka lagi
+    periodeDipilih = null; // kembali ke periode berjalan juga
     muat();
   }
 });
@@ -744,6 +846,7 @@ document.addEventListener("visibilitychange", () => {
       ind.style.height = "44px";
       ind.textContent = "⟳ Memuat...";
       hariDipilih = null;       // tarik = kembali ke hari ini + segarkan
+      periodeDipilih = null;    // dan ke periode berjalan
       muat();
       setTimeout(() => { ind.style.height = "0px"; }, 900);
     } else {
@@ -759,22 +862,58 @@ document.addEventListener("visibilitychange", () => {
   }, 45000);
 })();
 
-/* ---------- Tema mengikuti setelan HP (tanpa tombol) ---------- */
+/* ---------- Tema: Otomatis (ikut HP), Terang, atau Gelap (pilihan manual) ---------- */
 (function(){
   const root = document.documentElement;
   const meta = document.querySelector('meta[name="theme-color"]');
-  const mq = window.matchMedia ? window.matchMedia("(prefers-color-scheme: dark)") : null;
+  let mq = null;
+  try{ mq = window.matchMedia ? window.matchMedia("(prefers-color-scheme: dark)") : null; }
+  catch(e){ mq = null; }
+  const tombol = document.querySelectorAll("#temaToggle button");
 
+  function ambilSimpanan(){
+    try{ return localStorage.getItem("tema"); }catch(e){ return null; }
+  }
+  function simpan(pilihan){
+    try{
+      if (pilihan === "system") localStorage.removeItem("tema");
+      else localStorage.setItem("tema", pilihan);
+    }catch(e){}
+  }
   function terapkan(gelap){
     const t = gelap ? "dark" : "light";
     root.setAttribute("data-theme", t);
     if (meta) meta.setAttribute("content", t === "light" ? "#F3F6FC" : "#0B1220");
   }
-  terapkan(mq ? mq.matches : true);
-  if (mq){
-    const onChange = (e) => terapkan(e.matches);
-    if (mq.addEventListener) mq.addEventListener("change", onChange);
-    else if (mq.addListener) mq.addListener(onChange);   // Safari lama
+  function tandaiAktif(pilihan){
+    tombol.forEach(b => b.classList.toggle("aktif", b.dataset.tema === (pilihan || "system")));
   }
+  function terapkanDariPilihan(pilihan){
+    if (pilihan === "light") terapkan(false);
+    else if (pilihan === "dark") terapkan(true);
+    else terapkan(mq ? mq.matches : true);   // otomatis = ikut HP
+    tandaiAktif(pilihan);
+  }
+
+  terapkanDariPilihan(ambilSimpanan());
+
+  // Kalau lagi mode "Otomatis" dan setelan HP berubah, ikut update.
+  if (mq){
+    try{
+      const onChange = (e) => { if (!ambilSimpanan()) terapkan(e.matches); };
+      if (mq.addEventListener) mq.addEventListener("change", onChange);
+      else if (mq.addListener) mq.addListener(onChange);   // Safari lama
+    }catch(e){}
+  }
+
+  // Tombol tema dipasang PALING TERAKHIR dan di luar blok mq di atas,
+  // supaya tetap terpasang walau matchMedia gagal/dibatasi lingkungan.
+  tombol.forEach(b => {
+    b.addEventListener("click", () => {
+      const pilihan = b.dataset.tema;
+      simpan(pilihan);
+      terapkanDariPilihan(pilihan);
+    });
+  });
 })();
 </script>
