@@ -191,6 +191,36 @@ h2::after{content:"";flex:1;height:1px;background:var(--line)}
   background-repeat:no-repeat;background-position:right 8px center;
 }
 
+/* ---------- tab: Ringkasan / Tabungan & Investasi ---------- */
+.tabs{
+  margin:16px 20px 0;display:grid;grid-template-columns:1fr 1fr;gap:4px;
+  background:var(--surface-2);padding:4px;border-radius:11px;
+}
+.tab-btn{
+  font-family:var(--body);font-size:12.5px;font-weight:500;color:var(--muted);
+  background:transparent;border:none;border-radius:8px;padding:9px 4px;cursor:pointer;
+  transition:background .15s ease,color .15s ease;
+}
+.tab-btn.aktif{background:var(--surface);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.18)}
+
+/* ---------- kartu besar (tab Tabungan & Investasi) ---------- */
+.kartu-besar{
+  margin:18px 20px 0;background:var(--surface);border:1px solid var(--line);
+  border-radius:16px;padding:20px 18px;
+}
+.kartu-besar .l{
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.13em;
+  text-transform:uppercase;color:var(--faint);
+}
+.kartu-besar .v{
+  font-family:var(--display);font-size:34px;font-weight:700;
+  margin-top:6px;letter-spacing:-.01em;
+}
+.kartu-besar .s{font-size:12.5px;color:var(--muted);margin-top:5px}
+.catatan-tab{
+  margin:16px 20px 0;font-size:12px;line-height:1.6;color:var(--faint);
+}
+
 /* ---------- batang terpilih + tooltip ---------- */
 .col.pilih i{opacity:1;outline:2px solid rgba(233,240,250,.9);outline-offset:1px;border-radius:3px}
 .chart-tip{
@@ -287,6 +317,13 @@ h2::after{content:"";flex:1;height:1px;background:var(--line)}
   <select id="pilihPeriode" aria-label="Pilih periode"></select>
 </div>
 
+<div class="tabs" id="tabs">
+  <button type="button" class="tab-btn aktif" data-tab="ringkasan">Ringkasan</button>
+  <button type="button" class="tab-btn" data-tab="tabungan">Tabungan &amp; Investasi</button>
+</div>
+
+<div id="tabRingkasan">
+
 <section class="hero">
   <div class="hero-lbl" id="heroLbl">Hari ini</div>
   <div class="hero-tgl" id="heroTgl">—</div>
@@ -305,19 +342,6 @@ h2::after{content:"";flex:1;height:1px;background:var(--line)}
     <div class="l">Total periode</div>
     <div class="v" id="vTotal">—</div>
     <div class="s" id="sTotal">—</div>
-  </div>
-</div>
-
-<div class="stat">
-  <div class="kartu">
-    <div class="l">Tabungan</div>
-    <div class="v" id="vTabungan">—</div>
-    <div class="s" id="sTabungan">—</div>
-  </div>
-  <div class="kartu">
-    <div class="l">Investasi</div>
-    <div class="v" id="vInvestasi">—</div>
-    <div class="s" id="sInvestasi">—</div>
   </div>
 </div>
 
@@ -352,6 +376,30 @@ h2::after{content:"";flex:1;height:1px;background:var(--line)}
 -->
 
 <div class="kaki" id="kaki">—</div>
+
+</div><!-- /tabRingkasan -->
+
+<div id="tabTabungan" style="display:none">
+
+  <div class="kartu-besar">
+    <div class="l">Tabungan · saldo berjalan</div>
+    <div class="v" id="vTabungan">—</div>
+    <div class="s" id="sTabungan">—</div>
+  </div>
+
+  <div class="kartu-besar">
+    <div class="l">Investasi · saldo berjalan</div>
+    <div class="v" id="vInvestasi">—</div>
+    <div class="s" id="sInvestasi">—</div>
+  </div>
+
+  <div class="catatan-tab">
+    Saldo berjalan = akumulasi semua transaksi kategori Tabungan/Investasi yang
+    tercatat lewat bot, ditambah saldo awal (khusus Tabungan). Angka di bawah judul
+    adalah setoran pada periode yang sedang dipilih di atas.
+  </div>
+
+</div><!-- /tabTabungan -->
 
 <div class="pengaturan">
   <div class="l">Tampilan</div>
@@ -945,6 +993,24 @@ document.addEventListener("visibilitychange", () => {
       const pilihan = b.dataset.tema;
       simpan(pilihan);
       terapkanDariPilihan(pilihan);
+    });
+  });
+})();
+
+/* ---------- tab: Ringkasan / Tabungan & Investasi ---------- */
+(function(){
+  const tombolTab = document.querySelectorAll(".tab-btn");
+  const panel = {
+    ringkasan: document.getElementById("tabRingkasan"),
+    tabungan:  document.getElementById("tabTabungan"),
+  };
+  tombolTab.forEach(b => {
+    b.addEventListener("click", () => {
+      tombolTab.forEach(x => x.classList.toggle("aktif", x === b));
+      const target = b.dataset.tab;
+      Object.keys(panel).forEach(k => {
+        if (panel[k]) panel[k].style.display = (k === target) ? "" : "none";
+      });
     });
   });
 })();
