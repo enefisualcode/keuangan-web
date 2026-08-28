@@ -308,6 +308,19 @@ h2::after{content:"";flex:1;height:1px;background:var(--line)}
   </div>
 </div>
 
+<div class="stat">
+  <div class="kartu">
+    <div class="l">Tabungan</div>
+    <div class="v" id="vTabungan">—</div>
+    <div class="s" id="sTabungan">—</div>
+  </div>
+  <div class="kartu">
+    <div class="l">Investasi</div>
+    <div class="v" id="vInvestasi">—</div>
+    <div class="s" id="sInvestasi">—</div>
+  </div>
+</div>
+
 <div class="rincian-head">
   <h2 id="rincianJudul">Rincian hari ini</h2>
   <span class="rule"></span>
@@ -358,6 +371,7 @@ h2::after{content:"";flex:1;height:1px;background:var(--line)}
    ============================================================ */
 const URL_DATA = "https://script.google.com/macros/s/AKfycbzZxDGpz_XMOrj7yeIARQkz6UmtCMHCUn2M-ZYhro0pF531xoDMbAsR0r0lD6vvWjxe/exec";
 const HARI_SIKLUS = 25;
+const SALDO_AWAL_TABUNGAN = 418751;   // saldo tabungan yang sudah ada sebelum mulai dicatat lewat bot
 
 let pengeluaran = [];
 let pemasukan = [];
@@ -483,6 +497,24 @@ function gambar(){
   document.getElementById("sRata").textContent = `dari ${hariAktif} hari ada transaksi`;
   document.getElementById("vTotal").textContent = rpk(totalPeriode);
   document.getElementById("sTotal").textContent = `hari ke-${hariKe} dari ${totalHari}`;
+
+  /* ---------- Tabungan & Investasi: bulan ini (periode berjalan) + saldo berjalan (kumulatif) ----------
+     "kategori" pengeluaran yang tercatat Tabungan/Investasi dianggap sebagai setoran,
+     bukan pengeluaran konsumtif — ditotal terpisah dari data pengeluaran yang sama. */
+  const totalKategoriSemua   = kat => pengeluaran.filter(r => r[1] === kat).reduce((a,r) => a + r[2], 0);
+  const totalKategoriPeriode = kat => periodeIni.filter(r => r[1] === kat).reduce((a,r) => a + r[2], 0);
+
+  const tabunganBulanIni  = totalKategoriPeriode("Tabungan");
+  const tabunganBerjalan  = SALDO_AWAL_TABUNGAN + totalKategoriSemua("Tabungan");
+  const investasiBulanIni = totalKategoriPeriode("Investasi");
+  const investasiBerjalan = totalKategoriSemua("Investasi");
+
+  document.getElementById("vTabungan").textContent = rpk(tabunganBerjalan);
+  document.getElementById("sTabungan").textContent =
+    tabunganBulanIni > 0 ? `+${rp(tabunganBulanIni)} bulan ini` : "belum ada bulan ini";
+  document.getElementById("vInvestasi").textContent = rpk(investasiBerjalan);
+  document.getElementById("sInvestasi").textContent =
+    investasiBulanIni > 0 ? `+${rp(investasiBulanIni)} bulan ini` : "belum ada bulan ini";
 
   /* ---------- rincian per hari + grafik interaktif ----------
      Pilih hari lewat dropdown ATAU ketuk batang grafik — keduanya menampilkan
