@@ -166,6 +166,7 @@ h2::after{content:"";flex:1;height:1px;background:var(--line)}
 .plegend{display:flex;gap:18px;justify-content:center;font-size:11.5px;color:var(--muted);margin-top:14px}
 .plegend span{display:flex;align-items:center;gap:6px}
 .plegend i{width:11px;height:11px;border-radius:3px;display:inline-block}
+.pchart-solo .pbars i{width:26px}
 
 /* ---------- pemilih hari (rincian) ---------- */
 .rincian-head{display:flex;align-items:center;gap:10px;margin:32px 20px 12px}
@@ -387,16 +388,27 @@ h2::after{content:"";flex:1;height:1px;background:var(--line)}
     <div class="s" id="sTabungan">—</div>
   </div>
 
+  <h2>Tren Tabungan per bulan</h2>
+  <div class="harian">
+    <div class="pchart pchart-solo" id="chartTabungan"></div>
+  </div>
+
   <div class="kartu-besar">
     <div class="l">Investasi · saldo berjalan</div>
     <div class="v" id="vInvestasi">—</div>
     <div class="s" id="sInvestasi">—</div>
   </div>
 
+  <h2>Tren Investasi per bulan</h2>
+  <div class="harian">
+    <div class="pchart pchart-solo" id="chartInvestasi"></div>
+  </div>
+
   <div class="catatan-tab">
     Saldo berjalan = akumulasi semua transaksi kategori Tabungan/Investasi yang
     tercatat lewat bot, ditambah saldo awal (khusus Tabungan). Angka di bawah judul
-    adalah setoran pada periode yang sedang dipilih di atas.
+    adalah setoran pada periode yang sedang dipilih di atas. Grafik tren menunjukkan
+    saldo berjalan di akhir tiap periode (siklus 25→24), bukan setoran per bulan.
   </div>
 
 </div><!-- /tabTabungan -->
@@ -788,6 +800,7 @@ function gambar(){
      in ${pemasukan.length}r/${rpk(pemasukan.reduce((a,r)=>a+(Number(r[1])||0),0))}`;
 
   gambarPeriode();
+  gambarTabunganInvestasi();
 }
 
 /* Grafik batang: pemasukan vs pengeluaran untuk beberapa periode terakhir. */
@@ -817,7 +830,76 @@ function gambarPeriode(){
   }).join("");
 }
 
-/* ---------- ambil data ---------- */
+/* ---------- tren Tabungan & Investasi (saldo berjalan per bulan) ---------- */
+function totalPerPeriodeKategori(kat){
+  const m = new Map();
+  pengeluaran.forEach(r => {
+    if (r[1] !== kat) return;
+    const k = keyPeriode(r[0]);
+    m.set(k, (m.get(k)||0) + (Number(r[2])||0));
+  });
+  return m;
+}
+
+/* Daftar kode periode "YYYY-MM" berurutan dari awalKey sampai akhirKey (inklusif),
+   maju satu bulan setiap langkah — supaya bulan tanpa transaksi tetap muncul
+   di grafik (saldo dibawa terus dari bulan sebelumnya, bukan hilang). */
+function urutanPeriode(awalKey, akhirKey){
+  const [ay, am] = awalKey.split("-").map(Number);
+  const [zy, zm] = akhirKey.split("-").map(Number);
+  const out = [];
+  let y = ay, m = am;
+  while (y < zy || (y === zy && m <= zm)){
+    out.push(y + "-" + String(m).padStart(2, "0"));
+    m++;
+    if (m > 12){ m = 1; y++; }
+  }
+  return out;
+}
+
+function renderTrenGrafik(wrap, keys, map, warna){
+  if (!wrap) return;
+  if (!keys.length){ wrap.innerHTML = ""; return; }
+  const maxv = Math.max(1, ...keys.map(k => map.get(k) || 0));
+  wrap.innerHTML = keys.map(k => {
+    const v = map.get(k) || 0;
+    const h = Math.max(2, Math.round(v / maxv * 110));
+    return `<div class="pcol">
+      <div class="pbars">
+        <i style="height:${h}px;background:${warna}" title="${k}: ${rp(v)}"></i>
+      </div>
+      <div class="plab">${k}</div>
+    </div>`;
+  }).join("");
+}
+
+function gambarTabunganInvestasi(){
+  const wrapT = document.getElementById("chartTabungan");
+  const wrapI = document.getElementById("chartInvestasi");
+  if (!wrapT || !wrapI) return;
+
+  const tabPer = totalPerPeriodeKategori("Tabungan");
+  const invPer = totalPerPeriodeKategori("Investasi");
+
+  const periodeSekarang = keyPeriode(kunciTgl(new Date()));
+  const semuaKeys = Array.from(new Set([...tabPer.keys(), ...invPer.keys(), periodeSekarang])).sort();
+  if (!semuaKeys.length){ wrapT.innerHTML = ""; wrapI.innerHTML = ""; return; }
+
+  const urut = urutanPeriode(semuaKeys[0], periodeSekarang);
+
+  let kumTab = SALDO_AWAL_TABUNGAN, kumInv = 0;
+  const kumTabMap = new Map(), kumInvMap = new Map();
+  urut.forEach(k => {
+    kumTab += (tabPer.get(k) || 0);
+    kumInv += (invPer.get(k) || 0);
+    kumTabMap.set(k, kumTab);
+    kumInvMap.set(k, kumInv);
+  });
+
+  const enam = urut.slice(-6);   // 6 periode terakhir, konsisten dengan grafik Pemasukan vs Pengeluaran
+  renderTrenGrafik(wrapT, enam, kumTabMap, "var(--blue)");
+  renderTrenGrafik(wrapI, enam, kumInvMap, "var(--orange)");
+}
 function tampilkanGagal(pesan){
   document.getElementById("heroNum").textContent = "—";
   document.getElementById("wadahTrx").innerHTML =
