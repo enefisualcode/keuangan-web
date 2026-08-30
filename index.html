@@ -306,33 +306,27 @@ h2::after{content:"";flex:1;height:1px;background:var(--line)}
     display:grid;
     grid-template-columns:380px 1fr;
     column-gap:28px;
-    align-items:start;
   }
-  /* kolom kiri: ringkasan hari ini + statistik + rincian transaksi */
-  #tabRingkasan > *:nth-child(1){grid-column:1;grid-row:1}   /* hero */
-  #tabRingkasan > *:nth-child(2){grid-column:1;grid-row:2}   /* stat */
-  #tabRingkasan > *:nth-child(3){grid-column:1;grid-row:3}   /* rincian-head */
-  #tabRingkasan > *:nth-child(4){grid-column:1;grid-row:4;max-height:640px;overflow-y:auto} /* wadahTrx */
-  #tabRingkasan > *:nth-child(9){grid-column:1;grid-row:5}   /* kaki */
-  /* kolom kanan: grafik-grafik */
-  #tabRingkasan > *:nth-child(5){grid-column:2;grid-row:1;margin-top:0}  /* h2 Grafik harian */
-  #tabRingkasan > *:nth-child(6){grid-column:2;grid-row:2}               /* .harian chart */
-  #tabRingkasan > *:nth-child(7){grid-column:2;grid-row:3}               /* h2 Pemasukan vs Pengeluaran */
-  #tabRingkasan > *:nth-child(8){grid-column:2;grid-row:4}               /* .harian pchart */
+  .d-kiri{grid-column:1;grid-row:1}
+  .d-kanan{grid-column:2;grid-row:1;max-height:680px;overflow-y:auto}
+  /* elemen lain di dalam #tabRingkasan (bukan .d-kiri/.d-kanan) otomatis
+     ditaruh grid mengalir ke baris berikutnya oleh browser — di sini
+     dipaksa selebar 2 kolom supaya Pemasukan vs Pengeluaran & footer full-width */
+  #tabRingkasan > h2,
+  #tabRingkasan > .harian,
+  #tabRingkasan > .kaki{
+    grid-column:1/-1;
+  }
+  #tabRingkasan > h2{margin-top:28px}
 
   #tabTabungan{
     display:grid;
     grid-template-columns:1fr 1fr;
     column-gap:28px;
-    align-items:start;
   }
-  #tabTabungan > *:nth-child(1){grid-column:1;grid-row:1}   /* kartu Tabungan */
-  #tabTabungan > *:nth-child(2){grid-column:1;grid-row:2}   /* h2 tren Tabungan */
-  #tabTabungan > *:nth-child(3){grid-column:1;grid-row:3}   /* chart Tabungan */
-  #tabTabungan > *:nth-child(4){grid-column:2;grid-row:1}   /* kartu Investasi */
-  #tabTabungan > *:nth-child(5){grid-column:2;grid-row:2}   /* h2 tren Investasi */
-  #tabTabungan > *:nth-child(6){grid-column:2;grid-row:3}   /* chart Investasi */
-  #tabTabungan > *:nth-child(7){grid-column:1/-1;grid-row:4;margin-top:22px} /* catatan-tab, penuh 2 kolom */
+  #tabTabungan .d-kiri{grid-column:1;grid-row:1}
+  #tabTabungan .d-kanan{grid-column:2;grid-row:1;max-height:none;overflow-y:visible}
+  #tabTabungan > .catatan-tab{grid-column:1/-1;margin-top:22px}
 
   /* Tab switcher jadi lebih ringkas (bukan full-width) di layar lebar */
   .tabs{max-width:420px}
@@ -375,40 +369,44 @@ h2::after{content:"";flex:1;height:1px;background:var(--line)}
 
 <div id="tabRingkasan">
 
-<section class="hero">
-  <div class="hero-lbl" id="heroLbl">Hari ini</div>
-  <div class="hero-tgl" id="heroTgl">—</div>
-  <div class="hero-num" id="heroNum">—</div>
-  <div class="banding" id="banding"></div>
-  <div class="hero-pl" id="heroPL"></div>
-</section>
+<div class="d-kiri">
+  <section class="hero">
+    <div class="hero-lbl" id="heroLbl">Hari ini</div>
+    <div class="hero-tgl" id="heroTgl">—</div>
+    <div class="hero-num" id="heroNum">—</div>
+    <div class="banding" id="banding"></div>
+    <div class="hero-pl" id="heroPL"></div>
+  </section>
 
-<div class="stat">
-  <div class="kartu">
-    <div class="l">Rata-rata harian</div>
-    <div class="v" id="vRata">—</div>
-    <div class="s" id="sRata">—</div>
+  <div class="stat">
+    <div class="kartu">
+      <div class="l">Rata-rata harian</div>
+      <div class="v" id="vRata">—</div>
+      <div class="s" id="sRata">—</div>
+    </div>
+    <div class="kartu">
+      <div class="l">Total periode</div>
+      <div class="v" id="vTotal">—</div>
+      <div class="s" id="sTotal">—</div>
+    </div>
   </div>
-  <div class="kartu">
-    <div class="l">Total periode</div>
-    <div class="v" id="vTotal">—</div>
-    <div class="s" id="sTotal">—</div>
+
+  <h2>Grafik harian</h2>
+  <div class="harian">
+    <div class="chart" id="chart"></div>
+    <div class="xlab"><span id="xAwal">—</span><span id="xAkhir">—</span></div>
+    <div class="catatan" id="catatan">—</div>
   </div>
-</div>
+</div><!-- /d-kiri -->
 
-<div class="rincian-head">
-  <h2 id="rincianJudul">Rincian hari ini</h2>
-  <span class="rule"></span>
-  <select id="pilihHari" aria-label="Pilih hari"></select>
-</div>
-<div id="wadahTrx"></div>
-
-<h2>Grafik harian</h2>
-<div class="harian">
-  <div class="chart" id="chart"></div>
-  <div class="xlab"><span id="xAwal">—</span><span id="xAkhir">—</span></div>
-  <div class="catatan" id="catatan">—</div>
-</div>
+<div class="d-kanan">
+  <div class="rincian-head">
+    <h2 id="rincianJudul">Rincian hari ini</h2>
+    <span class="rule"></span>
+    <select id="pilihHari" aria-label="Pilih hari"></select>
+  </div>
+  <div id="wadahTrx"></div>
+</div><!-- /d-kanan -->
 
 <h2>Pemasukan vs Pengeluaran</h2>
 <div class="harian">
@@ -432,27 +430,31 @@ h2::after{content:"";flex:1;height:1px;background:var(--line)}
 
 <div id="tabTabungan" style="display:none">
 
-  <div class="kartu-besar">
-    <div class="l">Tabungan · saldo berjalan</div>
-    <div class="v" id="vTabungan">—</div>
-    <div class="s" id="sTabungan">—</div>
-  </div>
+  <div class="d-kiri">
+    <div class="kartu-besar">
+      <div class="l">Tabungan · saldo berjalan</div>
+      <div class="v" id="vTabungan">—</div>
+      <div class="s" id="sTabungan">—</div>
+    </div>
 
-  <h2>Tren Tabungan per bulan</h2>
-  <div class="harian">
-    <div class="pchart pchart-solo" id="chartTabungan"></div>
-  </div>
+    <h2>Tren Tabungan per bulan</h2>
+    <div class="harian">
+      <div class="pchart pchart-solo" id="chartTabungan"></div>
+    </div>
+  </div><!-- /d-kiri -->
 
-  <div class="kartu-besar">
-    <div class="l">Investasi · saldo berjalan</div>
-    <div class="v" id="vInvestasi">—</div>
-    <div class="s" id="sInvestasi">—</div>
-  </div>
+  <div class="d-kanan">
+    <div class="kartu-besar">
+      <div class="l">Investasi · saldo berjalan</div>
+      <div class="v" id="vInvestasi">—</div>
+      <div class="s" id="sInvestasi">—</div>
+    </div>
 
-  <h2>Tren Investasi per bulan</h2>
-  <div class="harian">
-    <div class="pchart pchart-solo" id="chartInvestasi"></div>
-  </div>
+    <h2>Tren Investasi per bulan</h2>
+    <div class="harian">
+      <div class="pchart pchart-solo" id="chartInvestasi"></div>
+    </div>
+  </div><!-- /d-kanan -->
 
   <div class="catatan-tab">
     Saldo berjalan = akumulasi semua transaksi kategori Tabungan/Investasi yang
