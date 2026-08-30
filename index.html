@@ -328,8 +328,7 @@ h2::after{content:"";flex:1;height:1px;background:var(--line)}
   #tabTabungan .d-kanan{grid-column:2;grid-row:1;max-height:none;overflow-y:visible}
   #tabTabungan > .catatan-tab{grid-column:1/-1;margin-top:22px}
 
-  /* Tab switcher jadi lebih ringkas (bukan full-width) di layar lebar */
-  .tabs{max-width:420px}
+  /* Tab switcher tetap full-width mengikuti lebar wadah (tidak dibatasi lagi) */
 }
 </style>
 <script>
@@ -390,13 +389,6 @@ h2::after{content:"";flex:1;height:1px;background:var(--line)}
       <div class="s" id="sTotal">—</div>
     </div>
   </div>
-
-  <h2>Grafik harian</h2>
-  <div class="harian">
-    <div class="chart" id="chart"></div>
-    <div class="xlab"><span id="xAwal">—</span><span id="xAkhir">—</span></div>
-    <div class="catatan" id="catatan">—</div>
-  </div>
 </div><!-- /d-kiri -->
 
 <div class="d-kanan">
@@ -407,6 +399,13 @@ h2::after{content:"";flex:1;height:1px;background:var(--line)}
   </div>
   <div id="wadahTrx"></div>
 </div><!-- /d-kanan -->
+
+<h2>Grafik harian</h2>
+<div class="harian">
+  <div class="chart" id="chart"></div>
+  <div class="xlab"><span id="xAwal">—</span><span id="xAkhir">—</span></div>
+  <div class="catatan" id="catatan">—</div>
+</div>
 
 <h2>Pemasukan vs Pengeluaran</h2>
 <div class="harian">
