@@ -184,6 +184,7 @@ h2::after{content:"";flex:1;height:1px;background:var(--line)}
 
 /* ---------- pemilih periode (siklus 25 -> 24) ---------- */
 .periode-ganti{margin:10px 20px 0;display:flex;justify-content:flex-end}
+#eksporLaporan{margin-left:8px;font:600 11px var(--mono);color:var(--text);background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:6px 10px;cursor:pointer}
 #pilihPeriode{
   font-family:var(--mono);font-size:11px;color:var(--blue);
   background:var(--surface-2);border:1px solid var(--line);border-radius:9px;
@@ -359,6 +360,7 @@ h2::after{content:"";flex:1;height:1px;background:var(--line)}
 
 <div class="periode-ganti">
   <select id="pilihPeriode" aria-label="Pilih periode"></select>
+  <button type="button" id="eksporLaporan">Ekspor laporan</button>
 </div>
 
 <div class="tabs" id="tabs">
@@ -473,6 +475,8 @@ h2::after{content:"";flex:1;height:1px;background:var(--line)}
   </div>
 </div>
 
+<script src="holidays.js"></script>
+<script src="period.js"></script>
 <script>
 /* ============================================================
    SUMBER DATA
@@ -481,7 +485,9 @@ h2::after{content:"";flex:1;height:1px;background:var(--line)}
    Cara membuatnya ada di README dan file apps-script.gs.
    ============================================================ */
 const URL_DATA = "https://script.google.com/macros/s/AKfycbzZxDGpz_XMOrj7yeIARQkz6UmtCMHCUn2M-ZYhro0pF531xoDMbAsR0r0lD6vvWjxe/exec";
-const HARI_SIKLUS = 25;
+const HARI_SIKLUS = PeriodUtils.PAYDAY;
+const ZONA_WAKTU = PeriodUtils.JAKARTA;
+const DAFTAR_LIBUR = new Set(typeof TANGGAL_LIBUR === "undefined" ? [] : TANGGAL_LIBUR);
 const SALDO_AWAL_TABUNGAN = 418751;   // saldo tabungan yang sudah ada sebelum mulai dicatat lewat bot
 
 let pengeluaran = [];
@@ -494,31 +500,39 @@ let periodeDipilih = null;       // kode "YYYY-MM" periode yang sedang dilihat; 
 const rp  = n => "Rp" + Math.round(n).toLocaleString("id-ID");
 const rpk = n => n >= 1e6 ? "Rp" + (n/1e6).toFixed(n%1e6===0?0:1) + " jt"
                           : "Rp" + Math.round(n/1000) + "rb";
-const d = s => new Date(s + "T00:00:00");
-const fmt = (t,o) => t.toLocaleDateString("id-ID", o);
-const kunciTgl = t => t.getFullYear() + "-" +
-  String(t.getMonth()+1).padStart(2,"0") + "-" +
-  String(t.getDate()).padStart(2,"0");
-
-function awalPeriode(acuan){
-  const t = new Date(acuan);
-  const m = t.getDate() >= HARI_SIKLUS ? t.getMonth() : t.getMonth()-1;
-  return new Date(t.getFullYear(), m, HARI_SIKLUS);
-}
+const d = PeriodUtils.dateKeyToDate;
+const fmt = (t,o) => t.toLocaleDateString("id-ID", Object.assign({timeZone:ZONA_WAKTU}, o));
+const kunciTgl = PeriodUtils.toKey;
 
 /* Kode periode "YYYY-MM" berdasar bulan awal siklus (mis. 2026-07). */
 function keyPeriode(tglStr){
-  const a = awalPeriode(d(tglStr));
-  return a.getFullYear() + "-" + String(a.getMonth()+1).padStart(2,"0");
+  return PeriodUtils.periodKey(tglStr, DAFTAR_LIBUR);
 }
 
 /* Rentang tanggal (teks) untuk sebuah kode periode "YYYY-MM". */
 function labelPeriode(key){
-  const [th, bl] = key.split("-").map(Number);
-  const awal = new Date(th, bl-1, HARI_SIKLUS);
-  const akhir = new Date(awal.getFullYear(), awal.getMonth()+1, HARI_SIKLUS-1);
+  const {start: awal, end: akhir} = PeriodUtils.periodForCode(key, DAFTAR_LIBUR);
   return fmt(awal,{day:"numeric",month:"short"}) + " – " + fmt(akhir,{day:"numeric",month:"short",year:"numeric"});
 }
+
+function eksporLaporan(){
+  const key = periodeDipilih || keyPeriode(PeriodUtils.jakartaTodayKey());
+  const {start, end} = PeriodUtils.periodForCode(key, DAFTAR_LIBUR);
+  const dalamPeriode = row => { const t = d(row[0]); return t >= start && t <= end; };
+  const rows = [["Jenis","Tanggal","Kategori","Nominal","Merchant/Sumber","Catatan","Tipe"]];
+  pengeluaran.filter(dalamPeriode).forEach(r => rows.push(["Pengeluaran", r[0], r[1], r[2], r[3] || "", r[5] || "", r[6] || ""]));
+  pemasukan.filter(dalamPeriode).forEach(r => rows.push(["Pemasukan", r[0], "", r[1], r[2] || "", r[3] || "", ""]));
+  const csv = rows.map(row => row.map(value => '"' + String(value ?? "").replace(/"/g, '""') + '"').join(",")).join("\r\n");
+  const blob = new Blob(["\uFEFF" + csv], {type:"text/csv;charset=utf-8"});
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "laporan-" + key + ".csv";
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
+document.getElementById("eksporLaporan").addEventListener("click", eksporLaporan);
 
 function gambar(){
   if (!pengeluaran.length){
@@ -529,17 +543,13 @@ function gambar(){
     return;
   }
 
-  const sekarang = new Date();
-  const hariIni = new Date(sekarang.getFullYear(), sekarang.getMonth(), sekarang.getDate());
+  const hariIni = d(PeriodUtils.jakartaTodayKey());
   const kunciHariIni = kunciTgl(hariIni);
 
   const periodeSekarangKey = keyPeriode(kunciTgl(hariIni));
   const periodeAktifKey = periodeDipilih || periodeSekarangKey;
   const sedangPeriodeIni = periodeAktifKey === periodeSekarangKey;
-  const [pTahun, pBulan] = periodeAktifKey.split("-").map(Number);
-
-  const mulai   = new Date(pTahun, pBulan-1, HARI_SIKLUS);
-  const selesai = new Date(mulai.getFullYear(), mulai.getMonth()+1, HARI_SIKLUS-1);
+  const {start: mulai, end: selesai} = PeriodUtils.periodForCode(periodeAktifKey, DAFTAR_LIBUR);
   const totalHari = Math.round((selesai-mulai)/864e5)+1;
   const akhirTampil = sedangPeriodeIni ? hariIni : selesai;   // periode lampau: tampilkan penuh sampai hari terakhir
   const hariKe    = Math.max(Math.round((akhirTampil-mulai)/864e5)+1, 1);
@@ -705,7 +715,7 @@ function gambar(){
   /* ---------- grafik harian (interaktif) ---------- */
   const deret=[];
   for(let i=0;i<hariKe;i++){
-    const t=new Date(mulai.getFullYear(),mulai.getMonth(),mulai.getDate()+i);
+    const t=PeriodUtils.addDays(mulai, i);
     const k=kunciTgl(t);
     deret.push({tgl:t,k:k,nilai:perHari.get(k)||0,kini:k===kunciHariIni});
   }
@@ -932,7 +942,7 @@ function gambarTabunganInvestasi(){
   const tabPer = totalPerPeriodeKategori("Tabungan");
   const invPer = totalPerPeriodeKategori("Investasi");
 
-  const periodeSekarang = keyPeriode(kunciTgl(new Date()));
+  const periodeSekarang = keyPeriode(PeriodUtils.jakartaTodayKey());
   const semuaKeys = Array.from(new Set([...tabPer.keys(), ...invPer.keys(), periodeSekarang])).sort();
   if (!semuaKeys.length){ wrapT.innerHTML = ""; wrapI.innerHTML = ""; return; }
 
